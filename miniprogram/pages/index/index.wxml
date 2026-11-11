@@ -1,0 +1,58 @@
+<!-- pages/index/index.wxml -->
+<view class="page">
+  <!-- 待开始 -->
+  <view wx:if="{{status === 'idle'}}" class="state idle-state">
+    <view class="hero">
+      <view class="hero-title">一秒不差？</view>
+      <view class="hero-subtitle">你真的懂一秒吗？</view>
+      <view class="target-pill">目标时间 1.000 秒</view>
+    </view>
+
+    <view class="card best-card">
+      <view class="card-label">个人最佳误差</view>
+      <view wx:if="{{hasBest}}" class="best-value">
+        {{bestError}}<text class="unit">ms</text>
+      </view>
+      <view wx:else class="best-empty">还没有挑战记录</view>
+    </view>
+
+    <view class="card rule-card">
+      <view class="rule-title">怎么玩</view>
+      <view class="rule-text">点开始后计时全程隐藏。觉得刚好过了一秒，就按下停止。误差越小，越接近“人体原子钟”。</view>
+    </view>
+
+    <view class="footer">
+      <button class="primary-btn" bindtap="onStart">开始挑战</button>
+      <view class="precision-tip">计时基于设备时钟，毫秒结果仅供娱乐</view>
+    </view>
+  </view>
+
+  <view wx:elif="{{status === 'running'}}" class="state running-state">
+    <view class="running-title">凭感觉！</view>
+    <view class="running-hint">觉得刚好一秒，就按下停止</view>
+    <button class="stop-btn" bindtap="onStop">立即停止</button>
+  </view>
+
+  <view wx:elif="{{status === 'result'}}" class="state result-state">
+    <view class="card result-card">
+      <view class="card-label">本次误差</view>
+      <view class="error-value">{{error}}<text class="error-unit">ms</text></view>
+      <view class="tier">{{tier}}</view>
+
+      <view class="result-lines">
+        <view class="result-line">实际用时 <text class="strong">{{durationText}}</text> 秒</view>
+        <view class="result-line">{{fastSlowText}}</view>
+      </view>
+
+      <view class="new-best" wx:if="{{isNewBest}}">新纪录！刷新个人最佳</view>
+      <view class="muted-line" wx:else>未刷新个人最佳</view>
+      <view class="best-line" wx:if="{{hasBest}}">当前最佳误差：{{bestError}}ms</view>
+      <view class="best-line" wx:else>还没有最佳成绩</view>
+      <view class="invalid-tip" wx:if="{{invalid}}">超出有效范围（0–3000ms），本局不计入最佳成绩</view>
+    </view>
+
+    <view class="footer">
+      <button class="primary-btn" bindtap="onRestart">再来一次</button>
+    </view>
+  </view>
+</view>
