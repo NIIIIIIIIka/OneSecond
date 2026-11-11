@@ -120,6 +120,16 @@
   color: #b0b4bb;
 }
 
+.sync-chip {
+  display: inline-block;
+  margin-top: 16rpx;
+  padding: 6rpx 20rpx;
+  border-radius: 999rpx;
+  background: #f2f3f5;
+  color: #8a8f99;
+  font-size: 22rpx;
+}
+
 .rule-title {
   font-size: 28rpx;
   font-weight: 600;
@@ -135,8 +145,9 @@
 
 /* ---------- ready ---------- */
 
-.ready-main {
-  padding-top: 120rpx;
+.ready-state {
+  align-items: center;
+  justify-content: center;
   text-align: center;
 }
 
@@ -172,13 +183,12 @@
   color: #8a8f99;
 }
 
-.instant-btn {
+.action-btn {
   width: 100%;
   height: 120rpx;
   line-height: 120rpx;
   margin-top: 120rpx;
   border-radius: 999rpx;
-  background: #ff4d4f;
   color: #ffffff;
   font-size: 44rpx;
   font-weight: 700;
@@ -186,9 +196,17 @@
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
-.instant-btn:active {
+.action-btn:active {
   opacity: 0.85;
   transform: scale(0.98);
+}
+
+.instant-btn {
+  background: #ff4d4f;
+}
+
+.ready-btn {
+  background: #2f80ed;
 }
 
 /* ---------- result ---------- */

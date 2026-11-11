@@ -1,0 +1,9 @@
+{
+  "name": "getMyScore",
+  "version": "1.0.0",
+  "description": "OneSecond: read my personal best score",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}
