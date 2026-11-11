@@ -40,6 +40,11 @@ eq(r2.fastSlowText, "偏快了 158ms", "偏快文案");
 const r3 = calcResult(1158, null);
 eq(r3.fastSlowText, "偏慢了 158ms", "偏慢文案");
 
+// ---- 偏快 / 偏慢 / 正好一秒 ----
+eq(calcResult(1000, null).direction, "正好一秒", "direction 正好一秒");
+eq(calcResult(990, null).direction, "偏快了", "direction 偏快");
+eq(calcResult(1010, null).direction, "偏慢了", "direction 偏慢");
+
 // ---- 只有严格小于才刷新 ----
 eq(calcResult(1005, 5).isNewBest, false, "误差相同不刷新");
 eq(calcResult(1000, 5).isNewBest, true, "误差更小刷新");

@@ -29,6 +29,16 @@ function getFastSlowText(elapsed) {
 }
 
 /**
+ * 偏快 / 偏慢 / 正好一秒（用于结果页方向展示）
+ * @param {number} elapsed 实际用时（ms）
+ */
+function getDirectionText(elapsed) {
+  const diff = elapsed - TARGET_MS;
+  if (diff === 0) return "正好一秒";
+  return diff < 0 ? "偏快了" : "偏慢了";
+}
+
+/**
  * 毫秒转“秒”，保留 3 位小数
  * @param {number} ms
  */
@@ -53,6 +63,7 @@ function calcResult(elapsed, bestError) {
     valid,
     isNewBest,
     tier: getTier(error),
+    direction: getDirectionText(elapsed),
     fastSlowText: getFastSlowText(elapsed),
     durationText: formatSeconds(elapsed),
   };
@@ -64,6 +75,7 @@ module.exports = {
   VALID_MAX_MS,
   getTier,
   getFastSlowText,
+  getDirectionText,
   formatSeconds,
   calcResult,
 };
