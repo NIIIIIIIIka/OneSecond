@@ -2,3 +2,7 @@ node_modules/
 project.private.config.json
 .DS_Store
 Thumbs.db
+cloudfunctions/**/node_modules/
+
+# 本地云环境配置（含真实环境 ID，不提交）
+miniprogram/config/cloud.js
