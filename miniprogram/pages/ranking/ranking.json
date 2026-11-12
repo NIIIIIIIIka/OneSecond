@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "一秒封神榜",
+  "navigationBarBackgroundColor": "#F5F7FB",
+  "navigationBarTextStyle": "black",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

@@ -1,0 +1,76 @@
+<!-- pages/ranking/ranking.wxml -->
+<view class="page">
+  <view class="header">
+    <view class="eyebrow">ONE SECOND MASTERS</view>
+    <view class="title">一秒封神榜</view>
+    <view class="subtitle">误差越小，越接近神</view>
+    <view class="total" wx:if="{{state === 'ready' || state === 'empty'}}">
+      共 {{total}} 人上榜
+    </view>
+  </view>
+
+  <view wx:if="{{state === 'loading'}}" class="state-box">
+    <view class="state-main">加载中…</view>
+  </view>
+
+  <view wx:elif="{{state === 'disabled'}}" class="state-box">
+    <view class="state-main">{{stateText}}</view>
+  </view>
+
+  <view wx:elif="{{state === 'error'}}" class="state-box">
+    <view class="state-main">{{stateText}}</view>
+    <button class="retry-btn" bindtap="onRetry">重试</button>
+  </view>
+
+  <view wx:elif="{{state === 'empty'}}" class="state-box empty-box">
+    <view class="state-main">{{stateText}}</view>
+  </view>
+
+  <block wx:else>
+    <view wx:if="{{loading}}" class="refresh-tip">刷新中…</view>
+    <view wx:if="{{refreshError}}" class="refresh-error">{{refreshError}}</view>
+
+    <view class="rank-list">
+      <view
+        wx:for="{{list}}"
+        wx:key="rank"
+        class="{{item.rowClass}}"
+      >
+        <view class="{{item.rankClass}}">
+          <text wx:if="{{item.rank === 1}}">🥇</text>
+          <text wx:elif="{{item.rank === 2}}">🥈</text>
+          <text wx:elif="{{item.rank === 3}}">🥉</text>
+          <text wx:else>{{item.rank}}</text>
+        </view>
+        <view class="rank-person">
+          <view class="rank-name">{{item.isMe ? '我自己' : item.name}}</view>
+        </view>
+        <view class="rank-error">{{item.error}}<text class="unit">ms</text></view>
+      </view>
+    </view>
+  </block>
+
+  <view class="my-summary" wx:if="{{showMySummary}}">
+    <view>我的排名：第 {{my.rank}} 名 · {{my.percentText}}</view>
+    <view class="my-summary-gap">{{my.gapText}}</view>
+    <view class="my-summary-only" wx:if="{{my.onlyOne}}">目前只有一名上榜玩家</view>
+  </view>
+
+  <view class="my-bar" wx:if="{{showBottomBar}}">
+    <block wx:if="{{myStatus === 'ready'}}">
+      <view class="my-bar-top">
+        <view class="my-rank">我的排名 <text class="my-no">第 {{my.rank}} 名</text></view>
+        <view class="my-percent">{{my.percentText}}</view>
+      </view>
+      <view class="my-detail">{{my.gapText}}</view>
+      <view class="my-only" wx:if="{{my.onlyOne}}">目前只有一名上榜玩家</view>
+    </block>
+    <view wx:elif="{{myStatus === 'loading'}}" class="my-empty">
+      我的排名加载中…
+    </view>
+    <view wx:elif="{{myStatus === 'empty'}}" class="my-empty">
+      {{myText}}
+    </view>
+    <view wx:else class="my-empty">我的排名暂不可用</view>
+  </view>
+</view>

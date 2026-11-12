@@ -1,0 +1,9 @@
+{
+  "name": "getMyRank",
+  "version": "1.0.0",
+  "description": "OneSecond: read my personal rank",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

@@ -1,7 +1,9 @@
 // pages/index/index.js
 const { calcResult, formatSeconds } = require("../../utils/score");
 const { normalizeBest, compareBest } = require("../../utils/sync");
+const { buildRankFeedback } = require("../../utils/ranking");
 const cloud = require("../../services/cloud");
+const ranking = require("../../services/ranking");
 
 // M1 已使用的键，保持兼容
 const BEST_ERROR_KEY = "bestError";
@@ -27,6 +29,14 @@ Page({
     cloudEnabled: false,
     syncStatus: "", // "" | syncing | synced | pending
     syncText: "",
+    // M3：结果页排名反馈
+    rankStatus: "", // "" | loading | ready | pending | unavailable
+    rankText: "",
+    rankPercentText: "",
+    rankGapText: "",
+    rankBestText: "",
+    rankOnlyOne: false,
+    rankUnavailableText: "",
   },
 
   // 开始时间保存在实例字段中，setData 触发的重渲染不会重置它
@@ -39,6 +49,10 @@ Page({
   _onNetworkChange: null,
   _unloaded: false,
   _cloudVersion: 0,
+  // M3：排名请求令牌与局次，防止旧异步响应覆盖新状态
+  _rankToken: 0,
+  _resultRound: 0,
+  _syncPromise: null,
 
   onLoad() {
     this.loadBest();
@@ -60,6 +74,7 @@ Page({
   onUnload() {
     this.cancelRunning();
     this._unloaded = true;
+    this._rankToken += 1;
     this.unbindNetwork();
   },
 
@@ -140,6 +155,10 @@ Page({
 
     const bestError = result.isNewBest ? result.error : this.data.bestError;
 
+    this._resultRound += 1;
+    this._rankToken += 1;
+    const round = this._resultRound;
+
     this.setData({
       status: "result",
       elapsed: result.elapsed,
@@ -154,17 +173,30 @@ Page({
       bestDurationText: result.isNewBest
         ? result.durationText
         : this.data.bestDurationText,
+      rankStatus: this.data.cloudEnabled ? "loading" : "",
+      rankText: "",
+      rankPercentText: "",
+      rankGapText: "",
+      rankBestText: "",
+      rankOnlyOne: false,
+      rankUnavailableText: "",
     });
 
-    // 只有真正有效的成绩才需要同步；异步执行，绝不阻塞结果展示
+    // 同步与排名均为异步执行，绝不阻塞结果展示或重新挑战
+    let syncPromise = this._syncPromise;
     if (result.valid) {
-      this.trySync();
+      syncPromise = this.trySync();
+    }
+    if (this.data.cloudEnabled) {
+      this.refreshRankAfterSync(round, syncPromise);
     }
   },
 
   // result → ready：回到准备状态，不直接开始计时
   onRestart() {
     if (this.data.status !== "result") return;
+    this._resultRound += 1;
+    this.resetRankFeedback();
     this.setData({ status: "ready" });
   },
 
@@ -179,7 +211,18 @@ Page({
 
   initCloud() {
     if (!cloud.isEnabled()) {
-      this.setData({ cloudEnabled: false, syncStatus: "", syncText: "" });
+      this.setData({
+        cloudEnabled: false,
+        syncStatus: "",
+        syncText: "",
+        rankStatus: "",
+        rankText: "",
+        rankPercentText: "",
+        rankGapText: "",
+        rankBestText: "",
+        rankOnlyOne: false,
+        rankUnavailableText: "",
+      });
       return;
     }
 
@@ -310,12 +353,20 @@ Page({
       if (res.hasRecord && res.best) {
         const serverBest = normalizeBest(res.best);
         if (serverBest) {
+          const previousCloudBest = normalizeBest(this._cloudBest);
+          const cloudBestChanged =
+            !previousCloudBest ||
+            previousCloudBest.elapsed !== serverBest.elapsed ||
+            previousCloudBest.error !== serverBest.error;
           this._cloudVersion += 1;
           this._cloudBest = serverBest;
           this.saveCloudCache(serverBest);
           this.applyCloudBest(serverBest);
+          // 只有云端最佳确实变化时才清榜单缓存；普通页面进入不再重复拉榜。
+          if (cloudBestChanged) ranking.invalidate();
         }
       } else {
+        if (this._cloudBest) ranking.invalidate();
         this._cloudBest = null;
       }
 
@@ -335,33 +386,50 @@ Page({
     }
   },
 
-  // 决定是否提交；提交永远异步进行，不阻塞挑战
+  // 决定是否提交；提交永远异步进行，不阻塞挑战。
+  // 返回 Promise，方便结果页在同步结束后再刷新排名（排名必须与云端最佳一致）。
   trySync() {
-    if (!this.data.cloudEnabled || this._syncing) return;
+    if (!this.data.cloudEnabled) return Promise.resolve();
+    if (this._syncing) return this._syncPromise || Promise.resolve();
 
     const local = this.getLocalBest();
     if (!local) {
       this.updateSyncStatus("");
-      return;
+      return Promise.resolve();
     }
 
     const cmp = compareBest(local, this._cloudBest);
     if (cmp === "cloud") {
       this.applyCloudBest(this._cloudBest);
       this.updateSyncStatus("synced");
-      return;
+      return Promise.resolve();
     }
     if (cmp === "tie") {
       this.updateSyncStatus("synced");
-      return;
+      return Promise.resolve();
     }
 
-    this.submitLocalBest(local);
+    return this.submitLocalBest(local);
   },
 
-  async submitLocalBest(local) {
-    if (this._syncing) return;
+  submitLocalBest(local) {
+    if (this._syncing) return this._syncPromise || Promise.resolve();
+
     this._syncing = true;
+    const promise = this.runSubmitLocalBest(local);
+    this._syncPromise = promise;
+    promise.then(
+      () => {
+        if (this._syncPromise === promise) this._syncPromise = null;
+      },
+      () => {
+        if (this._syncPromise === promise) this._syncPromise = null;
+      }
+    );
+    return promise;
+  },
+
+  async runSubmitLocalBest(local) {
     this.updateSyncStatus("syncing");
 
     try {
@@ -379,10 +447,17 @@ Page({
       if (res.best) {
         const serverBest = normalizeBest(res.best);
         if (serverBest) {
+          const previousCloudBest = normalizeBest(this._cloudBest);
+          const cloudBestChanged =
+            !previousCloudBest ||
+            previousCloudBest.elapsed !== serverBest.elapsed ||
+            previousCloudBest.error !== serverBest.error;
           this._cloudVersion += 1;
           this._cloudBest = serverBest;
           this.saveCloudCache(serverBest);
           this.applyCloudBest(serverBest);
+          // 成绩未刷新时复用现有榜单缓存，避免无意义的重复请求。
+          if (cloudBestChanged) ranking.invalidate();
         }
       }
 
@@ -394,6 +469,15 @@ Page({
       } else {
         this.updateSyncStatus("synced");
       }
+
+      // 结果页若正在显示“排名待同步/不可用”，提交成功后补一次排名
+      if (
+        this.data.status === "result" &&
+        (this.data.rankStatus === "pending" ||
+          this.data.rankStatus === "unavailable")
+      ) {
+        this.refreshRankForResult(this._resultRound);
+      }
     } catch (e) {
       // 网络或云函数不可用：本地挑战继续，成绩保持待同步
       console.warn(
@@ -404,6 +488,147 @@ Page({
     } finally {
       this._syncing = false;
     }
+  },
+
+  /* ---------- M3：结果页排名反馈 ---------- */
+
+  resetRankFeedback() {
+    this._rankToken += 1;
+    this.setData({
+      rankStatus: "",
+      rankText: "",
+      rankPercentText: "",
+      rankGapText: "",
+      rankBestText: "",
+      rankOnlyOne: false,
+      rankUnavailableText: "",
+    });
+  },
+
+  // 等云端同步结束后再取排名，避免显示上一版最佳的名次。
+  async refreshRankAfterSync(round, syncPromise) {
+    if (!this.data.cloudEnabled) return;
+    if (syncPromise) {
+      try {
+        await syncPromise;
+      } catch (e) {
+        // 同步失败也继续尝试；排名请求会自行降级
+      }
+    }
+    if (this._unloaded) return;
+    if (round !== this._resultRound || this.data.status !== "result") return;
+    await this.refreshRankForResult(round);
+  },
+
+  async refreshRankForResult(round) {
+    if (this._unloaded || !this.data.cloudEnabled) return;
+    if (this.data.status !== "result" || round !== this._resultRound) return;
+
+    const token = ++this._rankToken;
+    this.setData({ rankStatus: "loading", rankUnavailableText: "" });
+
+    try {
+      const res = await ranking.fetchMyRank();
+      if (
+        this._unloaded ||
+        token !== this._rankToken ||
+        round !== this._resultRound ||
+        this.data.status !== "result"
+      ) {
+        // 用户已开始下一局或发起了更新的排名请求，丢弃旧响应
+        return;
+      }
+
+      if (!res || !res.ok) {
+        this.setData({
+          rankStatus: "unavailable",
+          rankUnavailableText: "排名暂不可用",
+        });
+        return;
+      }
+
+      if (!res.hasRecord || !res.best) {
+        const local = this.getLocalBest();
+        if (local && this.data.syncStatus !== "synced") {
+          this.setData({ rankStatus: "pending", rankUnavailableText: "" });
+        } else {
+          this.setData({
+            rankStatus: "unavailable",
+            rankUnavailableText: "完成一次有效挑战即可上榜",
+          });
+        }
+        return;
+      }
+
+      const serverBest = normalizeBest(res.best);
+      if (!serverBest) {
+        this.setData({
+          rankStatus: "unavailable",
+          rankUnavailableText: "排名暂不可用",
+        });
+        return;
+      }
+
+      const local = this.getLocalBest();
+      if (local && local.error < serverBest.error) {
+        // 本地已有更好的成绩但尚未同步，不能展示旧名次冒充本局排名
+        this.setData({ rankStatus: "pending", rankUnavailableText: "" });
+        return;
+      }
+      if (local && compareBest(local, serverBest) === "cloud") {
+        this.applyCloudBest(serverBest);
+      }
+
+      const feedback = buildRankFeedback(res, {
+        isNewBest: this.data.isNewBest,
+      });
+      if (!feedback) {
+        this.setData({
+          rankStatus: "unavailable",
+          rankUnavailableText: "排名暂不可用",
+        });
+        return;
+      }
+
+      this.setData({
+        rankStatus: "ready",
+        rankText: feedback.rankText,
+        rankPercentText: feedback.percentText,
+        rankGapText: feedback.gapText,
+        rankBestText: feedback.bestText,
+        rankOnlyOne: feedback.onlyOne,
+        rankUnavailableText: "",
+      });
+    } catch (e) {
+      if (
+        this._unloaded ||
+        token !== this._rankToken ||
+        round !== this._resultRound ||
+        this.data.status !== "result"
+      ) {
+        return;
+      }
+      console.warn(
+        "[OneSecond] getMyRank 调用失败：",
+        (e && (e.errMsg || e.message)) || e
+      );
+      this.setData({
+        rankStatus: "unavailable",
+        rankUnavailableText: "排名暂不可用",
+      });
+    }
+  },
+
+  onOpenRanking() {
+    if (typeof wx.navigateTo !== "function") return;
+    wx.navigateTo({
+      url: "/pages/ranking/ranking",
+      fail: () => {
+        if (typeof wx.showToast === "function") {
+          wx.showToast({ title: "排行榜暂不可用", icon: "none" });
+        }
+      },
+    });
   },
 
   updateSyncStatus(status) {
