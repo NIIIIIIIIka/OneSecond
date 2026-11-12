@@ -97,9 +97,20 @@
     </view>
 
     <view class="footer">
-      <button class="primary-btn" bindtap="onRestart">再来一局</button>
-      <button class="secondary-btn share-btn" open-type="share" bindtap="onShareTap">分享战绩</button>
-      <view class="ranking-entry result-ranking-entry" bindtap="onOpenRanking">查看一秒封神榜 <text>›</text></view>
+      <view class="primary-actions">
+        <button class="primary-btn" bindtap="onRestart">
+          <view class="action-icon action-icon-primary">↻</view>
+          <text>再来一局</text>
+        </button>
+        <button class="share-btn" open-type="share" bindtap="onShareTap">
+          <view class="action-icon">↗</view>
+          <text>分享战绩</text>
+        </button>
+      </view>
+      <view class="ranking-link" bindtap="onOpenRanking">
+        <text>查看榜单</text>
+        <text class="ranking-link-arrow">›</text>
+      </view>
     </view>
   </view>
 </view>
