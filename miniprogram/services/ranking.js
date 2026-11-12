@@ -21,6 +21,15 @@ function makeError(code, res) {
   return err;
 }
 
+// 给页面一个明确的缓存来源标记，避免把缓存内容误认为实时榜单。
+function withCacheMeta(data, fromCache, cachedAt, stale) {
+  return Object.assign({}, data, {
+    fromCache: Boolean(fromCache),
+    cachedAt: fromCache && Number.isFinite(cachedAt) ? cachedAt : null,
+    stale: Boolean(stale),
+  });
+}
+
 /**
  * 读取前 100 名榜单。
  * @param {{ force?: boolean }} options force 为 true 时绕过缓存与在途请求
@@ -32,23 +41,32 @@ function fetchTop(options) {
   }
 
   if (!force && cache && Date.now() - cache.at < CACHE_TTL_MS) {
-    return Promise.resolve(cache.data);
+    return Promise.resolve(withCacheMeta(cache.data, true, cache.at, false));
   }
   if (!force && inflight) {
     return inflight;
   }
 
   const seq = ++requestSeq;
-  const promise = cloud.getRank().then((res) => {
-    if (!res || !res.ok) {
-      throw makeError("GET_RANK_FAILED", res);
-    }
-    // 只让最新一次请求写入缓存，避免旧响应覆盖新数据
-    if (seq === requestSeq) {
-      cache = { at: Date.now(), data: res };
-    }
-    return res;
-  });
+  const promise = cloud
+    .getRank()
+    .then((res) => {
+      if (!res || !res.ok) {
+        throw makeError("GET_RANK_FAILED", res);
+      }
+      // 只让最新一次请求写入缓存，避免旧响应覆盖新数据
+      if (seq === requestSeq) {
+        cache = { at: Date.now(), data: res };
+      }
+      return withCacheMeta(res, false, null, false);
+    })
+    .catch((err) => {
+      // 请求失败时优先展示上次成功缓存，并标记为非实时数据。
+      if (cache) {
+        return withCacheMeta(cache.data, true, cache.at, true);
+      }
+      throw err;
+    });
 
   inflight = promise;
   promise.then(
