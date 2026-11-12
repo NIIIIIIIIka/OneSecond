@@ -32,6 +32,7 @@ global.wx = {
 // 开启云开发（测试进程内有效）
 const cloudConfig = require("../miniprogram/config/cloud");
 cloudConfig.envId = "test-env";
+const ranking = require("../miniprogram/services/ranking");
 
 let pageDefinition = null;
 global.Page = (definition) => {
@@ -296,6 +297,53 @@ async function main() {
       "旧请求成功后仍保持待同步，避免误报"
     );
     eq(storage.get("bestError"), 5, "更好的本地成绩未被覆盖");
+  }
+
+  // ---- 8. 云端最佳未变化时不清空榜单缓存，变化时才失效 ----
+  {
+    const originalInvalidate = ranking.invalidate;
+    let invalidations = 0;
+    ranking.invalidate = () => {
+      invalidations += 1;
+    };
+
+    try {
+      storage.clear();
+      storage.set("bestError", 10);
+      storage.set("bestElapsed", 1010);
+      storage.set("cloudBest", { elapsed: 1010, error: 10 });
+      cloudHandler = (name) => {
+        if (name === "getMyScore") {
+          return Promise.resolve({
+            ok: true,
+            hasRecord: true,
+            best: { elapsed: 1010, error: 10 },
+          });
+        }
+        return Promise.resolve({ ok: false });
+      };
+
+      freshPage();
+      await tick(5);
+      eq(invalidations, 0, "相同云端最佳复用榜单缓存");
+
+      cloudHandler = (name) => {
+        if (name === "getMyScore") {
+          return Promise.resolve({
+            ok: true,
+            hasRecord: true,
+            best: { elapsed: 1005, error: 5 },
+          });
+        }
+        return Promise.resolve({ ok: false });
+      };
+
+      freshPage();
+      await tick(5);
+      eq(invalidations, 1, "云端最佳变化时失效榜单缓存");
+    } finally {
+      ranking.invalidate = originalInvalidate;
+    }
   }
 
   console.log(`✓ ${passed} 项断言全部通过`);

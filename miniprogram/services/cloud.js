@@ -37,4 +37,10 @@ module.exports = {
   getMyScore() {
     return callFunction("getMyScore", {});
   },
+  getRank() {
+    return callFunction("getRank", {});
+  },
+  getMyRank() {
+    return callFunction("getMyRank", {});
+  },
 };
