@@ -90,11 +90,15 @@
       </block>
       <view wx:elif="{{rankStatus === 'loading'}}" class="rank-feedback-muted">排名计算中…</view>
       <view wx:elif="{{rankStatus === 'pending'}}" class="rank-feedback-muted">排名待同步，稍后刷新</view>
-      <view wx:else class="rank-feedback-muted">{{rankUnavailableText || '排名暂不可用'}}</view>
+      <view wx:else class="rank-feedback-muted">
+        {{rankUnavailableText || '排名暂不可用'}}
+        <text class="rank-retry" wx:if="{{canRetryRank}}" bindtap="onRetryRank">重试</text>
+      </view>
     </view>
 
     <view class="footer">
       <button class="primary-btn" bindtap="onRestart">再来一局</button>
+      <button class="secondary-btn share-btn" open-type="share" bindtap="onShareTap">分享战绩</button>
       <view class="ranking-entry result-ranking-entry" bindtap="onOpenRanking">查看一秒封神榜 <text>›</text></view>
     </view>
   </view>

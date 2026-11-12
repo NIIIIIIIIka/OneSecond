@@ -1,5 +1,7 @@
 // pages/ranking/ranking.js
 const ranking = require("../../services/ranking");
+const share = require("../../utils/share");
+const stats = require("../../services/stats");
 const { formatPercent, formatGap } = require("../../utils/ranking");
 
 function isValidMyRank(res) {
@@ -41,6 +43,7 @@ Page({
     stateText: "加载中…",
     loading: true,
     refreshError: "",
+    cacheNotice: "",
     list: [],
     total: 0,
     meInTop100: false,
@@ -54,6 +57,7 @@ Page({
   onLoad() {
     this._requestId = 0;
     this._unloaded = false;
+    stats.recordRankingOpen();
 
     const enabled = ranking.isEnabled();
     this.setData({ cloudEnabled: enabled });
@@ -63,6 +67,7 @@ Page({
         stateText: "排行榜暂未开放",
         loading: false,
         refreshError: "",
+        cacheNotice: "",
         list: [],
         total: 0,
         meInTop100: false,
@@ -115,6 +120,7 @@ Page({
     if (!hadContent) {
       patch.state = "loading";
       patch.stateText = "加载中…";
+      patch.cacheNotice = "";
     }
     this.setData(patch);
 
@@ -135,7 +141,8 @@ Page({
       if (hadContent && this.data.list.length > 0) {
         this.setData({
           loading: false,
-          refreshError: "刷新失败，显示上次结果",
+          refreshError: "刷新失败，当前显示缓存排名，可能不是最新",
+          cacheNotice: "当前显示缓存排名，可能不是最新",
         });
       } else {
         this.setData({
@@ -143,6 +150,7 @@ Page({
           stateText: "排行榜加载失败，请下拉刷新重试",
           loading: false,
           refreshError: "",
+          cacheNotice: "",
           list: [],
           total: 0,
           meInTop100: false,
@@ -163,6 +171,7 @@ Page({
         stateText: "排行榜加载失败，请下拉刷新重试",
         loading: false,
         refreshError: "",
+        cacheNotice: "",
         list: [],
         total: 0,
         meInTop100: false,
@@ -195,11 +204,19 @@ Page({
 
     const nextMyStatus =
       this.data.myStatus === "idle" ? "loading" : this.data.myStatus;
+    const cacheNotice = top.fromCache
+      ? "当前显示缓存排名，可能不是最新"
+      : "";
+    const refreshError =
+      top.fromCache && top.stale
+        ? "刷新失败，当前显示缓存排名"
+        : "";
     this.setData({
       state,
       stateText,
       loading: false,
-      refreshError: "",
+      refreshError,
+      cacheNotice,
       list,
       total,
       meInTop100,
@@ -255,5 +272,34 @@ Page({
         meInTop100 &&
         myStatus === "ready",
     });
+  },
+
+  onShareTap() {
+    stats.recordShareEntryClick();
+  },
+
+  onShareAppMessage() {
+    const rank = this.data.my && this.data.my.rank;
+    return share.buildRankingShare({
+      rankConfirmed: this.data.myStatus === "ready",
+      rank,
+    });
+  },
+
+  onBackToChallenge() {
+    const goHome = () => {
+      if (typeof wx.reLaunch === "function") {
+        wx.reLaunch({ url: share.SHARE_PATH });
+      }
+    };
+    if (typeof wx.navigateBack === "function") {
+      try {
+        wx.navigateBack({ delta: 1, fail: goHome });
+      } catch (e) {
+        goHome();
+      }
+      return;
+    }
+    goHome();
   },
 });

@@ -7,7 +7,10 @@
     <view class="total" wx:if="{{state === 'ready' || state === 'empty'}}">
       共 {{total}} 人上榜
     </view>
+    <button class="share-btn ranking-share-btn" open-type="share" bindtap="onShareTap">分享榜单</button>
   </view>
+
+  <view wx:if="{{cacheNotice}}" class="cache-notice">{{cacheNotice}}</view>
 
   <view wx:if="{{state === 'loading'}}" class="state-box">
     <view class="state-main">加载中…</view>
@@ -24,6 +27,7 @@
 
   <view wx:elif="{{state === 'empty'}}" class="state-box empty-box">
     <view class="state-main">{{stateText}}</view>
+    <button class="retry-btn" bindtap="onBackToChallenge">去挑战</button>
   </view>
 
   <block wx:else>
