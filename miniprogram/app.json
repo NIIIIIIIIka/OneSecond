@@ -1,11 +1,12 @@
 {
   "pages": [
-    "pages/index/index"
+    "pages/index/index",
+    "pages/ranking/ranking"
   ],
   "window": {
-    "backgroundColor": "#F7F7F8",
+    "backgroundColor": "#F5F7FB",
     "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#F7F7F8",
+    "navigationBarBackgroundColor": "#F5F7FB",
     "navigationBarTitleText": "一秒不差？",
     "navigationBarTextStyle": "black"
   },
